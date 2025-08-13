@@ -1,0 +1,23 @@
+{
+  "name": "uniswap-v4-workshop",
+  "module": "index.ts",
+  "type": "module",
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5.0.0"
+  },
+  "private": true,
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "ui": "cd apps/ui && bun install && bun run dev",
+    "indexer:dev": "cd apps/indexer && bun install && bunx envio dev",
+    "dashboard": "cd apps/dashboard && bun install && bun run dev",
+    "abi:sync": "bun scripts/sync-abi.mjs",
+    "contracts:build": "cd contracts && forge build",
+    "contracts:deploy": "cd contracts && forge script script/Deploy.s.sol --rpc-url $UNICHAIN_SEPOLIA_RPC --private-key $PK --broadcast"
+  }
+}
