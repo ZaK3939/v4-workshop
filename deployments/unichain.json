@@ -1,0 +1,11 @@
+{
+  "network": "unichain",
+  "chainId": 130,
+  "poolManager": "0x1f98400000000000000000000000000000000004",
+  "positionManager": "0x4529a01c7a0410167c5740c487a8de60232617bf",
+  "stateView": "0x86e8631a016f9068c3f085faf484ee3f5fdee8f2",
+  "universalRouter": "0xef740bf23acae26f6492b10de645d6b98dc8eaf3",
+  "permit2": "0x000000000022D473030F116dDEE9F6B43aC78BA3",
+  "quoter": "0x333e3c607b141b18ff6de9f258db6e77fe7491e0",
+  "usdc": "0x078D782b760474a361dDA0AF3839290b0EF57AD6"
+}

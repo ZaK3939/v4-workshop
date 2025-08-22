@@ -1,0 +1,10 @@
+{
+  "network": "unichain-sepolia",
+  "chainId": 1301,
+  "poolManager": "0x2000d755f9e4F3c77E0C9dfb6f84a609E2A0f0fd",
+  "positionManager": "0x20c68F046F956Ed5Dc43f1C9ad97A612E10fC439",
+  "stateView": "0x333Dc4f382a7eb09D2B941b70fa1f2C7a2Ce19b6",
+  "universalRouter": "0x0000000000000000000000000000000000000000",
+  "permit2": "0x000000000022D473030F116dDEE9F6B43aC78BA3",
+  "quoter": "0x0000000000000000000000000000000000000000"
+}
