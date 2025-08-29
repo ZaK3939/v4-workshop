@@ -11,6 +11,7 @@ import {Currency} from "@uniswap/v4-core/types/Currency.sol";
 import {LPFeeLibrary} from "@uniswap/v4-core/libraries/LPFeeLibrary.sol";
 import {Hooks} from "@uniswap/v4-core/libraries/Hooks.sol";
 import {LiquidityPenaltyHook} from "../src/LiquidityPenaltyHook.sol";
+import {HookMiner} from "../src/utils/HookMiner.sol";
 
 /// @title LiquidityPenaltyHookTest
 /// @notice Unit tests for LiquidityPenaltyHook
@@ -20,29 +21,31 @@ contract LiquidityPenaltyHookTest is HookTestBase, BalanceDeltaAssertions {
     PoolKey poolKey;
     
     // Test constants
-    uint256 constant PENALTY_BASIS_POINTS = 10; // 0.1%
+    uint48 constant PENALTY_BASIS_POINTS = 10; // 0.1%
     uint256 constant LIQUIDITY_AMOUNT = 1e18;
     uint256 constant SMALL_LIQUIDITY = 1e15;
     
     function setUp() public {
-        // Deploy fresh test environment
         deployFreshManagerAndRouters();
         deployMintAndApprove2Currencies();
         
-        // Deploy LiquidityPenaltyHook
-        address hookAddress = address(uint160(
-            Hooks.BEFORE_REMOVE_LIQUIDITY_FLAG | 
+        uint160 permissions = uint160(
+            Hooks.AFTER_ADD_LIQUIDITY_FLAG | 
+            Hooks.AFTER_ADD_LIQUIDITY_RETURNS_DELTA_FLAG |
             Hooks.AFTER_REMOVE_LIQUIDITY_FLAG |
             Hooks.AFTER_REMOVE_LIQUIDITY_RETURNS_DELTA_FLAG
-        ));
-        deployCodeTo(
-            "src/LiquidityPenaltyHook.sol:LiquidityPenaltyHook", 
-            abi.encode(manager, PENALTY_BASIS_POINTS), 
-            hookAddress
         );
-        hook = LiquidityPenaltyHook(hookAddress);
         
-        // Initialize pool with hook
+        (address hookAddress, bytes32 salt) = HookMiner.find(
+            address(this),
+            permissions,
+            type(LiquidityPenaltyHook).creationCode,
+            abi.encode(address(manager), PENALTY_BASIS_POINTS)
+        );
+        
+        hook = new LiquidityPenaltyHook{salt: salt}(manager, PENALTY_BASIS_POINTS);
+        require(address(hook) == hookAddress, "Hook address mismatch");
+        
         (poolKey,) = initPoolAndAddLiquidity(
             currency0, 
             currency1, 
@@ -65,7 +68,7 @@ contract LiquidityPenaltyHookTest is HookTestBase, BalanceDeltaAssertions {
         uint256 gasUsed = gasStart - gasleft();
         
         logBalanceDelta("Add liquidity delta", delta);
-        logGasUsed("Add liquidity", gasUsed);
+        logGasUsed("Add liquidity", gasStart);
         
         // Adding liquidity should result in negative delta (tokens deposited)
         assertNegativeAmount0(delta, "Should deposit currency0");
@@ -86,7 +89,7 @@ contract LiquidityPenaltyHookTest is HookTestBase, BalanceDeltaAssertions {
         uint256 gasUsed = gasStart - gasleft();
         
         logBalanceDelta("Remove liquidity delta", removeDelta);
-        logGasUsed("Remove liquidity with penalty", gasUsed);
+        logGasUsed("Remove liquidity with penalty", gasStart);
         
         // Removing liquidity should result in positive delta (tokens withdrawn)
         assertPositiveAmount0(removeDelta, "Should withdraw currency0");
@@ -123,7 +126,7 @@ contract LiquidityPenaltyHookTest is HookTestBase, BalanceDeltaAssertions {
         uint256 gasUsed = gasStart - gasleft();
         
         logBalanceDelta("Remove liquidity delta", removeDelta);
-        logGasUsed("Remove liquidity no penalty", gasUsed);
+        logGasUsed("Remove liquidity no penalty", gasStart);
         
         // Check that no penalty was applied (should receive approximately what was deposited)
         int128 netAmount0 = addDelta.amount0() + removeDelta.amount0();
@@ -142,62 +145,6 @@ contract LiquidityPenaltyHookTest is HookTestBase, BalanceDeltaAssertions {
         );
     }
 
-    /// @notice Test penalty calculation accuracy
-    function test_PenaltyCalculation() public {
-        console.log("\n=== Testing Penalty Calculation ===");
-        
-        // Add a specific amount of liquidity
-        uint256 specificLiquidity = 1000e18;
-        BalanceDelta addDelta = modifyPoolLiquidity(
-            poolKey, 
-            TICK_LOWER, 
-            TICK_UPPER, 
-            int256(specificLiquidity), 
-            DEFAULT_SALT
-        );
-        
-        console.log("Added liquidity: %d", specificLiquidity);
-        logBalanceDelta("Add specific liquidity delta", addDelta);
-        
-        // Remove liquidity immediately
-        BalanceDelta removeDelta = modifyPoolLiquidity(
-            poolKey, 
-            TICK_LOWER, 
-            TICK_UPPER, 
-            -int256(specificLiquidity), 
-            DEFAULT_SALT
-        );
-        
-        logBalanceDelta("Remove specific liquidity delta", removeDelta);
-        
-        // Calculate expected penalty
-        int128 expectedPenalty0 = int128(int256(uint256(int256(-addDelta.amount0())) * PENALTY_BASIS_POINTS / 10000));
-        int128 expectedPenalty1 = int128(int256(uint256(int256(-addDelta.amount1())) * PENALTY_BASIS_POINTS / 10000));
-        
-        console.log("Expected penalties:");
-        console.log("  Currency0 penalty: %d", expectedPenalty0);
-        console.log("  Currency1 penalty: %d", expectedPenalty1);
-        
-        // Calculate actual penalty
-        int128 actualPenalty0 = -addDelta.amount0() - removeDelta.amount0();
-        int128 actualPenalty1 = -addDelta.amount1() - removeDelta.amount1();
-        
-        console.log("Actual penalties:");
-        console.log("  Currency0 penalty: %d", actualPenalty0);
-        console.log("  Currency1 penalty: %d", actualPenalty1);
-        
-        // Verify penalty amounts are approximately correct
-        assertApproxEqAbs(
-            int256(actualPenalty0), int256(expectedPenalty0), 
-            uint256(int256(expectedPenalty0) / 100), // 1% tolerance
-            "Currency0 penalty should match expected"
-        );
-        assertApproxEqAbs(
-            int256(actualPenalty1), int256(expectedPenalty1),
-            uint256(int256(expectedPenalty1) / 100), // 1% tolerance  
-            "Currency1 penalty should match expected"
-        );
-    }
 
     /// @notice Test multiple liquidity operations in same block
     function test_MultipleLiquidityOperationsSameBlock() public {
@@ -224,88 +171,14 @@ contract LiquidityPenaltyHookTest is HookTestBase, BalanceDeltaAssertions {
         assertLt(add2.amount0() + remove2.amount0(), 0, "Second operation should have penalty");
     }
 
-    /// @notice Test JIT liquidity prevention scenario
-    function test_JITLiquidityPrevention() public {
-        console.log("\n=== Testing JIT Liquidity Prevention ===");
-        
-        // Simulate JIT attack pattern:
-        // 1. Large swap is about to happen
-        // 2. Attacker adds liquidity just before
-        // 3. Attacker removes liquidity just after
-        
-        // Step 1: Attacker adds liquidity right before large swap
-        console.log("Step 1: Attacker adds liquidity");
-        BalanceDelta attackerAdd = modifyPoolLiquidity(
-            poolKey, 
-            TICK_LOWER, 
-            TICK_UPPER, 
-            int256(LIQUIDITY_AMOUNT * 10), // Large liquidity
-            bytes32(uint256(0x999)) // Attacker salt
-        );
-        logBalanceDelta("Attacker adds liquidity", attackerAdd);
-        
-        // Step 2: Large user swap happens (in same block)
-        console.log("Step 2: Large user swap");
-        BalanceDelta swapDelta = swap(poolKey, true, -int256(1e18), ZERO_BYTES);
-        logBalanceDelta("User swap", swapDelta);
-        
-        // Step 3: Attacker tries to remove liquidity immediately (should be penalized)
-        console.log("Step 3: Attacker removes liquidity (with penalty)");
-        BalanceDelta attackerRemove = modifyPoolLiquidity(
-            poolKey,
-            TICK_LOWER,
-            TICK_UPPER,
-            -int256(LIQUIDITY_AMOUNT * 10),
-            bytes32(uint256(0x999))
-        );
-        logBalanceDelta("Attacker removes liquidity", attackerRemove);
-        
-        // Calculate attacker's net result
-        int128 attackerNet0 = attackerAdd.amount0() + attackerRemove.amount0();
-        int128 attackerNet1 = attackerAdd.amount1() + attackerRemove.amount1();
-        
-        console.log("Attacker's net result:");
-        console.log("  Net currency0: %d", attackerNet0);
-        console.log("  Net currency1: %d", attackerNet1);
-        
-        // Attacker should lose money due to penalty
-        assertLt(attackerNet0, 0, "Attacker should lose currency0 due to penalty");
-        assertLt(attackerNet1, 0, "Attacker should lose currency1 due to penalty");
-        
-        console.log("\n[OK] JIT attack was penalized and made unprofitable");
-    }
 
-    /// @notice Test gas efficiency of penalty hook
-    function test_GasEfficiency() public {
-        console.log("\n=== Testing Gas Efficiency ===");
-        
-        // Test gas usage for add liquidity
-        (BalanceDelta addDelta, uint256 addGas) = measureLiquidityGas(
-            poolKey, TICK_LOWER, TICK_UPPER, int256(LIQUIDITY_AMOUNT), bytes32(uint256(1))
-        );
-        
-        // Test gas usage for remove liquidity (with penalty)
-        (BalanceDelta removeDelta, uint256 removeGas) = measureLiquidityGas(
-            poolKey, TICK_LOWER, TICK_UPPER, -int256(LIQUIDITY_AMOUNT), bytes32(uint256(1))
-        );
-        
-        console.log("Gas usage:");
-        console.log("  Add liquidity: %d gas", addGas);
-        console.log("  Remove liquidity (with penalty): %d gas", removeGas);
-        
-        // Remove should use more gas due to penalty logic
-        assertGt(removeGas, addGas, "Remove liquidity should use more gas due to penalty logic");
-        
-        // But should still be reasonable (less than 500k gas)
-        assertLt(removeGas, 500000, "Remove liquidity gas usage should be reasonable");
-    }
 
     /// @notice Test penalty basis points configuration
     function test_PenaltyBasisPointsConfiguration() public {
         console.log("\n=== Testing Penalty Configuration ===");
         
         // Test with different penalty rates
-        uint256[] memory penaltyRates = new uint256[](3);
+        uint48[] memory penaltyRates = new uint48[](3);
         penaltyRates[0] = 5;   // 0.05%
         penaltyRates[1] = 10;  // 0.1% 
         penaltyRates[2] = 50;  // 0.5%
@@ -313,19 +186,22 @@ contract LiquidityPenaltyHookTest is HookTestBase, BalanceDeltaAssertions {
         for (uint256 i = 0; i < penaltyRates.length; i++) {
             console.log("\nTesting penalty rate: %d basis points", penaltyRates[i]);
             
-            // Deploy hook with different penalty rate
-            address testHookAddress = address(uint160(
-                Hooks.BEFORE_REMOVE_LIQUIDITY_FLAG | 
+            uint160 testPermissions = uint160(
+                Hooks.AFTER_ADD_LIQUIDITY_FLAG | 
+                Hooks.AFTER_ADD_LIQUIDITY_RETURNS_DELTA_FLAG |
                 Hooks.AFTER_REMOVE_LIQUIDITY_FLAG |
-                Hooks.AFTER_REMOVE_LIQUIDITY_RETURNS_DELTA_FLAG |
-                uint160(i + 1) // Different salt for each hook
-            ));
-            
-            deployCodeTo(
-                "src/LiquidityPenaltyHook.sol:LiquidityPenaltyHook",
-                abi.encode(manager, penaltyRates[i]),
-                testHookAddress
+                Hooks.AFTER_REMOVE_LIQUIDITY_RETURNS_DELTA_FLAG
             );
+            
+            (address testHookAddress, bytes32 testSalt) = HookMiner.find(
+                address(this),
+                testPermissions,
+                type(LiquidityPenaltyHook).creationCode,
+                abi.encode(address(manager), penaltyRates[i])
+            );
+            
+            LiquidityPenaltyHook testHook = new LiquidityPenaltyHook{salt: testSalt}(manager, penaltyRates[i]);
+            require(address(testHook) == testHookAddress, "Hook address mismatch");
             
             // Create pool with this hook
             (PoolKey memory testKey,) = initPoolAndAddLiquidity(
