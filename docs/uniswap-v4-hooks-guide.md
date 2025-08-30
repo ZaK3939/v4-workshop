@@ -211,10 +211,168 @@ contract AdvancedTradingHook {
 
 ## 5. Implementation Considerations
 
-### 5.1 Events
+### 5.1 Hook Fees and Data Standards
 
-- There are standard ways to emit events
-- Details: [Hook Data Standards Guide](https://www.uniswapfoundation.org/blog/developer-guide-establishing-hook-data-standards-for-uniswap-v4)
+#### Hook Fee Collection Patterns
+
+Hooks can collect fees through multiple mechanisms, each with specific use cases:
+
+**1. Dynamic Hook Fees (afterSwapReturnDelta)**
+```solidity
+// Example: Collect 0.1% fee on swaps
+function afterSwap(
+    address sender,
+    PoolKey calldata key,
+    SwapParams calldata params,
+    BalanceDelta delta,
+    bytes calldata hookData
+) external returns (bytes4, int128) {
+    // Calculate fee on unspecified amount
+    int128 fee = calculateFee(delta);
+    
+    // Return negative fee to collect from swapper
+    return (this.afterSwap.selector, -fee);
+}
+```
+
+**2. Virtual Balance Management (ERC-6909)**
+```solidity
+// Hooks accumulate fees as virtual balances
+// Users can later withdraw accumulated fees
+currency.take(poolManager, recipient, amount, true); // true = claims (mint)
+currency.settle(poolManager, payer, amount, true);  // true = burn
+```
+
+**3. Fee Distribution via Donation**
+```solidity
+// Distribute collected fees to LPs
+poolManager.donate(key, amount0, amount1, hookData);
+```
+
+#### Hook Data Standards
+
+According to the [Uniswap Foundation Hook Data Standards Guide](https://www.uniswapfoundation.org/blog/developer-guide-establishing-hook-data-standards-for-uniswap-v4):
+
+**1. hookData Parameter Structure**
+```solidity
+// Recommended encoding for hookData
+bytes memory hookData = abi.encode(
+    address recipient,    // Who receives output/fees
+    uint256 minOutput,   // Slippage protection
+    bytes extraData      // Hook-specific data
+);
+```
+
+**2. Event Standards**
+```solidity
+// Standard event format for hook operations
+event HookFeeCollected(
+    PoolId indexed poolId,
+    address indexed collector,
+    Currency indexed currency,
+    uint256 amount,
+    bytes hookData
+);
+```
+
+**3. Fee Configuration Best Practices**
+- Store fee rates in hook storage, not hookData
+- Allow fee updates through governance/owner functions
+- Emit events for all fee collections
+- Document fee calculation methodology
+
+#### Implementation Example: Dynamic Fee Hook
+
+```solidity
+contract DynamicFeeHook is BaseHook {
+    using SafeCast for uint256;
+    
+    // Fee configuration
+    mapping(PoolId => uint24) public hookFees; // in hundredths of bps
+    
+    function afterSwap(
+        address sender,
+        PoolKey calldata key,
+        SwapParams calldata params,
+        BalanceDelta delta,
+        bytes calldata hookData
+    ) external override returns (bytes4, int128) {
+        // Decode hookData if needed
+        (address feeRecipient) = hookData.length > 0 
+            ? abi.decode(hookData, (address)) 
+            : sender;
+        
+        // Calculate fee on unspecified amount
+        (Currency unspecified, int128 unspecifiedAmount) = 
+            (params.amountSpecified < 0 == params.zeroForOne)
+            ? (key.currency1, delta.amount1())
+            : (key.currency0, delta.amount0());
+        
+        // Apply fee rate
+        uint24 feeRate = hookFees[key.toId()];
+        int128 hookFee = -int128(uint128(
+            uint256(uint128(unspecifiedAmount)) * feeRate / 1e6
+        ));
+        
+        // Mint fee to recipient as ERC-6909
+        if (hookFee < 0) {
+            poolManager.mint(
+                feeRecipient, 
+                unspecified.toId(), 
+                uint256(uint128(-hookFee))
+            );
+            
+            emit HookFeeCollected(
+                key.toId(),
+                feeRecipient,
+                unspecified,
+                uint256(uint128(-hookFee)),
+                hookData
+            );
+        }
+        
+        return (this.afterSwap.selector, hookFee);
+    }
+}
+```
+
+#### Real-World Fee Examples from Workshop Hooks
+
+**1. LiquidityPenaltyHook - Time-based Fee Withholding**
+```solidity
+// Withholds fees for recent liquidity additions
+// Penalties decrease linearly over blockNumberOffset period
+function _afterAddLiquidity(...) returns (bytes4, BalanceDelta) {
+    if (recentlyAdded) {
+        _takeFeesToHook(key, positionKey, feeDelta);
+        return (selector, feeDelta); // Hook keeps fees
+    }
+    return (selector, ZERO_DELTA); // User keeps fees
+}
+```
+
+**2. AntiSandwichHook - Price Protection Fees**
+```solidity
+// Collects difference between market price and protected price
+function _afterSwap(...) returns (bytes4, int128) {
+    if (protectionActive) {
+        int128 protectionFee = targetAmount - actualAmount;
+        // Fee minted to hook as ERC-6909
+        return (selector, protectionFee);
+    }
+}
+```
+
+**3. LimitOrderHook - Order Execution Fees**
+```solidity
+// Collects fees when orders are filled
+function _fillOrder(...) {
+    // Fees from filled orders accumulate in orderInfo
+    orderInfo.currency0Total += amount0Fee;
+    orderInfo.currency1Total += amount1Fee;
+    // Distributed to remaining order placers on cancel
+}
+```
 
 ### 5.2 Handling msg.sender
 
