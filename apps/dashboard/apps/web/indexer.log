@@ -1,0 +1,15 @@
+$ next dev --turbopack
+ ⚠ Warning: Found multiple lockfiles. Selecting /Users/zak3939/package-lock.json.
+   Consider removing the lockfiles at:
+   * /Users/zak3939/git/edcon2025/uniswap-v4-workshop/apps/dashboard/apps/web/package-lock.json
+   * /Users/zak3939/git/edcon2025/uniswap-v4-workshop/apps/dashboard/pnpm-lock.yaml
+   * /Users/zak3939/git/edcon2025/uniswap-v4-workshop/bun.lockb
+
+ ⚠ Port 3000 is in use by process 76507, using available port 3001 instead.
+   ▲ Next.js 15.4.6 (Turbopack)
+   - Local:        http://localhost:3001
+   - Network:      http://192.168.1.13:3001
+
+ ✓ Starting...
+ ✓ Ready in 1921ms
+error: script "dev" was terminated by signal SIGKILL (Forced quit)

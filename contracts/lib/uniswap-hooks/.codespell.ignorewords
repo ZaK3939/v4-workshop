@@ -1,0 +1,4 @@
+# Words to ignore in codespell checks
+# Format: one word per line, case-sensitive
+
+amountIn

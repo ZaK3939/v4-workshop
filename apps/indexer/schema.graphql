@@ -1,0 +1,198 @@
+type Swap {
+  id: ID!
+  chainId: BigInt!
+  transaction: String! # Instead of Transaction reference
+  timestamp: BigInt! @index
+  pool: String! # Instead of Pool reference
+  token0: Token! # Changed from String to Token reference
+  token1: Token! # Changed from String to Token reference
+  sender: String! # Instead of Bytes
+  origin: String! # Instead of Bytes
+  amount0: BigDecimal!
+  amount1: BigDecimal!
+  amountUSD: BigDecimal!
+  sqrtPriceX96: BigInt!
+  tick: BigInt!
+  logIndex: BigInt!
+}
+
+type PoolManager {
+  id: ID!
+  chainId: BigInt!
+  poolCount: BigInt!
+  txCount: BigInt!
+  totalVolumeUSD: BigDecimal!
+  totalVolumeETH: BigDecimal!
+  totalFeesUSD: BigDecimal!
+  totalFeesETH: BigDecimal!
+  untrackedVolumeUSD: BigDecimal!
+  totalValueLockedUSD: BigDecimal!
+  totalValueLockedETH: BigDecimal!
+  totalValueLockedUSDUntracked: BigDecimal!
+  totalValueLockedETHUntracked: BigDecimal!
+  owner: String!
+  numberOfSwaps: BigInt! # total swaps on network
+  hookedPools: BigInt! # number of pools with hooks
+  hookedSwaps: BigInt! # number of swaps through hooked pools
+}
+
+type Pool {
+  id: ID!
+  chainId: BigInt!
+  name: String!
+  createdAtTimestamp: BigInt!
+  createdAtBlockNumber: BigInt!
+  token0: String! # Instead of Token reference
+  token1: String! # Instead of Token reference
+  feeTier: BigInt!
+  liquidity: BigInt!
+  sqrtPrice: BigInt!
+  token0Price: BigDecimal!
+  token1Price: BigDecimal!
+  tick: BigInt
+  tickSpacing: BigInt!
+  observationIndex: BigInt!
+  volumeToken0: BigDecimal!
+  volumeToken1: BigDecimal!
+  volumeUSD: BigDecimal!
+  untrackedVolumeUSD: BigDecimal!
+  feesUSD: BigDecimal!
+  feesUSDUntracked: BigDecimal!
+  txCount: BigInt!
+  collectedFeesToken0: BigDecimal!
+  collectedFeesToken1: BigDecimal!
+  collectedFeesUSD: BigDecimal!
+  totalValueLockedToken0: BigDecimal!
+  totalValueLockedToken1: BigDecimal!
+  totalValueLockedETH: BigDecimal!
+  totalValueLockedUSD: BigDecimal! @index
+  totalValueLockedUSDUntracked: BigDecimal!
+  liquidityProviderCount: BigInt!
+  hooks: String!
+  # derived fields
+  ticks: [Tick!]! @derivedFrom(field: "pool")
+}
+
+type Tick {
+  id: ID! # <pool address>#<tickIdx>
+  chainId: BigInt!
+  pool: Pool! # Pointer back to Pool
+  tickIdx: BigInt! @index
+  liquidityGross: BigInt! # abs liquidity at this boundary
+  liquidityNet: BigInt! # delta when price crosses boundary
+  price0: BigDecimal! # Optional – 1.0001^tickIdx
+  price1: BigDecimal! # Optional inverse price
+  createdAtTimestamp: BigInt!
+  createdAtBlockNumber: BigInt!
+}
+
+type Token {
+  id: ID!
+  chainId: BigInt!
+  symbol: String!
+  name: String!
+  decimals: BigInt!
+  totalSupply: BigInt!
+  volume: BigDecimal!
+  volumeUSD: BigDecimal!
+  untrackedVolumeUSD: BigDecimal!
+  feesUSD: BigDecimal!
+  txCount: BigInt!
+  poolCount: BigInt!
+  totalValueLocked: BigDecimal!
+  totalValueLockedUSD: BigDecimal!
+  totalValueLockedUSDUntracked: BigDecimal!
+  derivedETH: BigDecimal!
+  whitelistPools: [String!]! # Changed from Pool reference to String for simplicity
+}
+
+# stores for USD calculations
+type Bundle {
+  id: ID!
+  # price of ETH in usd
+  ethPriceUSD: BigDecimal!
+}
+
+type HookStats {
+  id: ID! # hook address
+  chainId: BigInt!
+  numberOfPools: BigInt!
+  numberOfSwaps: BigInt!
+  firstPoolCreatedAt: BigInt!
+  totalValueLockedUSD: BigDecimal! # Total TVL across all pools using this hook
+  totalVolumeUSD: BigDecimal! # Total volume across all pools using this hook
+  untrackedVolumeUSD: BigDecimal! # Untracked volume for non-whitelisted tokens
+  totalFeesUSD: BigDecimal! # Total fees across all pools using this hook
+}
+
+type ModifyLiquidity {
+  id: ID!
+  chainId: BigInt!
+  transaction: String! # Instead of Transaction reference
+  timestamp: BigInt! @index
+  pool: Pool! # Instead of Pool reference
+  token0: Token! # Token reference like in Swap entity
+  token1: Token! # Token reference like in Swap entity
+  sender: String! # Instead of Bytes
+  origin: String! # Instead of Bytes - the EOA that initiated the txn
+  amount: BigInt! # amount of liquidity modified
+  amount0: BigDecimal! # amount of token 0 modified
+  amount1: BigDecimal! # amount of token 1 modified
+  amountUSD: BigDecimal! # derived amount based on available prices of tokens
+  tickLower: BigInt! # lower tick of the position
+  tickUpper: BigInt! # upper tick of the position
+  logIndex: BigInt! # index within the txn
+}
+
+type HookSwap {
+  id: ID!
+  chainId: BigInt!
+  poolId: String! # v4 pool id (bytes32)
+  hook: String! # hook address
+  transaction: String!
+  timestamp: BigInt! @index
+  sender: String! # router of the swap
+  amount0: BigDecimal!
+  amount1: BigDecimal!
+  hookLPfeeAmount0: BigDecimal!
+  hookLPfeeAmount1: BigDecimal!
+  logIndex: BigInt!
+}
+
+type HookFee {
+  id: ID!
+  chainId: BigInt!
+  poolId: String! # v4 pool id (bytes32)
+  hook: String! # hook address
+  transaction: String!
+  timestamp: BigInt! @index
+  sender: String! # router of the swap
+  feeAmount0: BigDecimal!
+  feeAmount1: BigDecimal!
+  logIndex: BigInt!
+}
+
+type HookModifyLiquidity {
+  id: ID!
+  chainId: BigInt!
+  poolId: String! # v4 pool id (bytes32)
+  hook: String! # hook address
+  transaction: String!
+  timestamp: BigInt! @index
+  sender: String! # router address
+  amount0: BigDecimal!
+  amount1: BigDecimal!
+  logIndex: BigInt!
+}
+
+type HookBonus {
+  id: ID!
+  chainId: BigInt!
+  poolId: String! # v4 pool id (bytes32)
+  hook: String! # hook address
+  transaction: String!
+  timestamp: BigInt! @index
+  amount0: BigDecimal!
+  amount1: BigDecimal!
+  logIndex: BigInt!
+}

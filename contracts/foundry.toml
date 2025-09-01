@@ -1,0 +1,48 @@
+# Full reference https://github.com/foundry-rs/foundry/tree/master/crates/config
+
+[profile.default]
+  auto_detect_solc = false
+  block_timestamp = 1_738_368_000 # Feb 1, 2025 at 00:00 GMT
+  bytecode_hash = "none"
+  evm_version = "cancun"
+  fuzz = { runs = 1_000 }
+  gas_reports = ["*"]
+  optimizer = true
+  optimizer_runs = 10_000
+  out = "out"
+  script = "script"
+  solc = "0.8.26"
+  ignored_error_codes = [5574]
+  src = "src"
+  test = "tests"
+  libs = ["lib"]
+  ignored_paths = ["node_modules", "lib/openzeppelin-contracts/test/**"]
+  fs_permissions = [{ access = "read-write", path = "./"}]
+
+[profile.ci]
+  fuzz = { runs = 10_000 }
+  verbosity = 4
+
+
+[fmt]
+  bracket_spacing = true
+  int_types = "long"
+  line_length = 120
+  multiline_func_header = "all"
+  number_underscore = "thousands"
+  quote_style = "double"
+  tab_width = 4
+  wrap_comments = true
+
+[rpc_endpoints]
+  unichain = "${UNICHAIN_RPC}"
+  unichain_sepolia = "${UNICHAIN_SEPOLIA_RPC}"
+  mainnet = "${MAINNET_RPC_URL}"
+  base = "${BASE_RPC_URL}"
+  base_sepolia = "${BASE_SEPOLIA_RPC_URL}"
+
+[etherscan]
+  unichain = { key = "${ETHERSCAN_API_KEY}", url = "https://api.uniscan.xyz/api" }
+  
+# Blockscout verification (no API key required)
+# Use: --verifier blockscout --verifier-url https://unichain.blockscout.com/api

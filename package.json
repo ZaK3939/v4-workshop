@@ -1,0 +1,33 @@
+{
+  "name": "uniswap-v4-workshop",
+  "module": "index.ts",
+  "type": "module",
+  "devDependencies": {
+    "@types/bun": "latest",
+    "tsx": "^4.19.0",
+    "viem": "^2.34.0"
+  },
+  "peerDependencies": {
+    "typescript": "^5.0.0"
+  },
+  "private": true,
+  "scripts": {
+    "indexer": "cd apps/indexer && pnpm install && pnpm run dev",
+    "dashboard": "cd apps/dashboard && pnpm install && pnpm run dev",
+    "contracts:build": "cd contracts && forge build",
+    "v4:deploy": "cd contracts && source .env && export ETH_FROM=$(cast wallet address --private-key $PK) && forge script script/01_DeployAndSave.s.sol --rpc-url $UNICHAIN_RPC --private-key $PK --broadcast --legacy --ffi -vvv",
+    "v4:pool": "cd contracts && source .env && export ETH_FROM=$(cast wallet address --private-key $PK) && forge script script/02_CreatePool.s.sol --rpc-url $UNICHAIN_RPC --private-key $PK --broadcast --legacy -vvv",
+    "v4:info": "cd contracts && source .env && forge script script/03_ShowPoolInfo.s.sol --rpc-url $UNICHAIN_RPC -vvv",
+    "v4:check": "bunx tsx scripts/check-pool-state.ts",
+    "v4:add": "bunx tsx scripts/04-add-liquidity.ts",
+    "v4:swap": "bunx tsx scripts/05-swap-universal-router.ts",
+    "v4:remove": "bunx tsx scripts/06-remove-liquidity.ts"
+  },
+  "dependencies": {
+    "@uniswap/universal-router-sdk": "^4.19.7",
+    "@uniswap/v3-sdk": "^3.25.2",
+    "@uniswap/v4-sdk": "^1.21.4",
+    "dotenv": "^17.2.1",
+    "ethers": "5"
+  }
+}
