@@ -18,14 +18,14 @@
 
 ## ⏱️ Timetable
 
-| Time      | Section                  | Content                                                           |
-| --------- | ------------------------ | ----------------------------------------------------------------- |
-| 0-5 min   | Environment Setup        | Clone repository, install dependencies, set environment variables |
-| 5-17 min  | Hook Deployment          | Deploy with HookMiner, Foundry tests, understand permission bits |
-| 17-25 min | Pool Creation            | Create pool with deployed hook, verify configuration             |
-| 25-35 min | SDK Operations           | Add/remove liquidity, execute swaps, verify hook behavior        |
-| 35-42 min | Indexer/UI Launch        | Visualization with Envio Indexer and dashboard                   |
-| 42-50 min | Security Review & Q&A    | Important security patterns, summary                              |
+| Time      | Section               | Content                                                           |
+| --------- | --------------------- | ----------------------------------------------------------------- |
+| 0-5 min   | Environment Setup     | Clone repository, install dependencies, set environment variables |
+| 5-17 min  | Hook Deployment       | Deploy with HookMiner, Foundry tests, understand permission bits  |
+| 17-25 min | Pool Creation         | Create pool with deployed hook, verify configuration              |
+| 25-35 min | SDK Operations        | Add/remove liquidity, execute swaps, verify hook behavior         |
+| 35-42 min | Indexer/UI Launch     | Visualization with Envio Indexer and dashboard                    |
+| 42-50 min | Security Review & Q&A | Important security patterns, summary                              |
 
 ---
 
@@ -187,10 +187,10 @@ forge script script/01_DeployAndSave.s.sol \
 
 ```bash
 # Check deployed addresses
-cat scripts/.deployment.env
+cat script/.deployment.env
 
 # Verify contract code
-cast code $(cat scripts/.deployment.env | grep LIQUIDITY_PENALTY_HOOK | cut -d'=' -f2) --rpc-url $UNICHAIN_RPC | wc -c
+cast code $(cat script/.deployment.env | grep LIQUIDITY_PENALTY_HOOK | cut -d'=' -f2) --rpc-url $UNICHAIN_RPC | wc -c
 ```
 
 > If code size is greater than 0, deployment was successful!
@@ -354,7 +354,7 @@ const mintOptions: MintOptions = {
   recipient: account.address,
   slippageTolerance: new Percent(50, 10_000), // 0.5%
   deadline: deadline.toString(),
-  useNative: ETH,  // Use ETH as native token
+  useNative: ETH, // Use ETH as native token
   hookData: '0x',
 };
 
@@ -382,7 +382,7 @@ bun run scripts/06-remove-liquidity.ts
 ```typescript
 // Calculate liquidity to remove (50% removal)
 const percentageToRemove = 0.5;
-const liquidityToRemove = currentLiquidity * BigInt(50) / BigInt(100);
+const liquidityToRemove = (currentLiquidity * BigInt(50)) / BigInt(100);
 
 // BurnOptions configuration
 const burnOptions: BurnOptions = {
@@ -431,7 +431,7 @@ const routePlanner = new RoutePlanner();
 // Swap parameters
 const swapParams = {
   poolKey: swapConfig.poolKey,
-  zeroForOne: true,  // ETH → USDC
+  zeroForOne: true, // ETH → USDC
   amountIn: swapAmount.toString(),
   amountOutMinimum: minAmountOut.toString(),
   hookData: '0x' as `0x${string}`,
@@ -443,9 +443,7 @@ v4Planner.addAction(Actions.SETTLE_ALL, [ETH, MAX_UINT128]);
 v4Planner.addAction(Actions.TAKE_ALL, [USDC, 0n]);
 
 // Add V4 command to Universal Router
-routePlanner.addCommand(CommandType.V4_SWAP, [
-  v4Planner.actions.toString()
-]);
+routePlanner.addCommand(CommandType.V4_SWAP, [v4Planner.actions.toString()]);
 ```
 
 > 1. **V4Planner**: Build V4-specific actions
@@ -517,6 +515,7 @@ bun run indexer
 ![Envio Indexer Running Screen](../assets/indexer-envio.png)
 
 > As shown above, when Indexer starts:
+>
 > - **Large ENVIO logo** appears and indexing begins
 > - **Processed events**: 22,451,830 events processed at high speed
 > - **Processed blocks**: 25,013,372 blocks (90% progress)
